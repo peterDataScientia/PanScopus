@@ -329,7 +329,7 @@ async function transferCsv(item,total){
   if(panTab.url!==job.appUrl)throw new Error("PanScopus tab changed; upload was blocked.");
   const response=await chrome.tabs.sendMessage(job.appTabId,{
     type:"PANSCOPUS_IMPORT_CSV",appUrl:job.appUrl,name,text:csv
-  });
+  },{frameId:Number.isInteger(job.appFrameId)?job.appFrameId:0});
   if(!response?.ok)throw new Error(response?.error||"PanScopus uploader rejected the file.");
   await chrome.tabs.update(job.appTabId,{active:true});
   log("CSV delivered to PanScopus Cloud importer. Verify its displayed count.");
