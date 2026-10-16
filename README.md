@@ -1,18 +1,13 @@
 # PanScopus — Streamlit Cloud
 
-## No Scopus API or local server required
+## Chrome Companion (no Scopus API, no local server)
 
-PanScopus now presents a **browser-assisted workflow** first when deployed on Streamlit Cloud:
+**Primary workflow:** PanScopus Cloud query → Chrome Companion runs Scopus Advanced Search in your authorized desktop Chrome browser → selects **all matching documents** and **all export metadata** → downloads CSV → checks downloaded row count → imports CSV into the PanScopus Cloud uploader.
 
-1. Paste an Advanced Search query into PanScopus. Copy it using the query block's copy control.
-2. Click **Open Scopus Advanced Search**; it opens Scopus in the user's ordinary authorized browser session.
-3. If needed, authenticate through your institution's official Research4Life login. Search, then use Scopus's ordinary **Export → CSV** interface to save all selected documents.
-4. Return to PanScopus Cloud, upload the CSV and inspect row counts, abstracts, column completeness, DOI/EID duplicates, and the dataset preview.
+**One-time setup:** Download [this GitHub repository as ZIP](https://github.com/peterDataScientia/PanScopus/archive/refs/heads/main.zip), extract it, open `chrome://extensions` in your usual Chrome browser, enable **Developer mode** → **Load unpacked** → select the `chrome_companion` folder. Then return to PanScopus Cloud, unlock with your PIN, reload, enter your query, click **Run Scopus Search + CSV via Chrome Companion** and choose the Chrome downloads folder when prompted.
 
-This workflow needs **no paid API, no local app, no local server, and no automation bypass**. It does still require using the Scopus site's native search/export UI. The hosted Selenium pathway remains under an optional expandable panel but cannot operate while Cloudflare blocks the Cloud server.
+The Companion has no API key and no local server. It operates only after user initiation in an authorized browser session. You may need to sign in through your institution when your normal Scopus/Research4Life browser session has expired. **Actual end-to-end Chrome/Scopus execution remains to be validated; passing code tests is not proof that Scopus's live UI will accept every action.** See [Companion installation and limitations](chrome_companion/README.md).
 
-
-Streamlit research workbench for authorized Research4Life → Scopus Advanced Search and bibliographic CSV processing. Automated browser access depends on Scopus permitting the hosted session.
 
 ## Deploy on Streamlit Community Cloud (free)
 
@@ -31,7 +26,7 @@ access_pin = "A_LONG_PRIVATE_PIN"
 
    Alternatively for existing deployments, top-level `R4L_USERNAME` and `R4L_PASSWORD` are also supported. **Never share institutional passwords or commit secrets to GitHub.**
 4. Reboot your deployed Streamlit app to install the Linux packages and reload the Secrets.
-5. Enter your app PIN. If Scopus accepts the Cloud Chromium session, click **Connect to Scopus → Run Search → Export all matching records**. Otherwise use **Import authorized Scopus CSV** with a CSV exported from an ordinary institutionally authorized Scopus session.
+5. Enter your app PIN, load the [Chrome Companion](chrome_companion/README.md), then use **Run Scopus Search + CSV via Chrome Companion** to automate the browser-side search and export. The existing Cloud Selenium buttons remain optional and are currently blocked by Cloudflare. CSV import remains available as a fallback.
 
 ## Security
 
