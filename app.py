@@ -9,6 +9,7 @@ from pathlib import Path
 import streamlit as st
 
 from scopus_backend import DEFAULT_QUERY, MAX_CSV_EXPORT, ScopusWorkbench
+from csv_import import parse_scopus_csv
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT = ROOT / "exports"
@@ -240,6 +241,73 @@ with st.container(border=True):
                     records = list(row for _, row in zip(range(5), csv.DictReader(handle)))
                 if records:
                     st.dataframe(records, hide_index=True)
+
+with st.container(border=True):
+    st.subheader("04 · Import authorized Scopus CSV")
+    st.caption(
+        "Cloudflare is currently refusing the hosted Scopus browser. "
+        "Export CSV from a Scopus session that your institution authorizes, "
+        "then upload it here for a record-count and metadata check. "
+        "No Selenium login is required for importing."
+    )
+    uploaded = st.file_uploader(
+        "Upload Scopus CSV",
+        type=["csv"],
+        key="scopus_csv_upload",
+        help="Original CSV export from Scopus. This does not bypass Cloudflare.",
+    )
+    if uploaded is not None:
+        try:
+            file_bytes = uploaded.getvalue()
+            summary = parse_scopus_csv(file_bytes)
+            expected_import_count = st.number_input(
+                "Expected Scopus result count (0 = skip comparison)",
+                min_value=0,
+                max_value=20000,
+                value=80,
+                step=1,
+                key="scopus_import_expected",
+            )
+            cols = st.columns(3)
+            cols[0].metric("CSV documents", f"{summary.count:,}")
+            cols[1].metric("Metadata columns", f"{len(summary.fields):,}")
+            cols[2].metric("Abstracts populated", f"{summary.abstract_populated:,}")
+            if expected_import_count:
+                if summary.count == expected_import_count:
+                    st.success(f"CSV count matches your expected total: {summary.count:,}/{expected_import_count:,}.")
+                else:
+                    st.error(
+                        f"CSV count {summary.count:,} differs from the expected "
+                        f"{expected_import_count:,} records."
+                    )
+            st.caption(
+                f"DOI populated: {summary.doi_populated:,} · "
+                f"Repeated nonempty DOI: {summary.doi_duplicates:,} · "
+                f"Repeated nonempty EID: {summary.eid_duplicates:,}"
+            )
+            if summary.doi_duplicates or summary.eid_duplicates:
+                st.warning(
+                    "Possible duplicate identifiers found; inspect records "
+                    "before PRISMA screening."
+                )
+            with st.expander("Scopus metadata preview (first 12 records)"):
+                st.dataframe(list(summary.preview), hide_index=True)
+            with st.expander("Exported metadata fields"):
+                st.write(", ".join(summary.fields))
+            st.download_button(
+                "Download original Scopus CSV",
+                file_bytes,
+                file_name=uploaded.name,
+                mime="text/csv",
+                use_container_width=True,
+                key="download_imported_csv",
+            )
+            st.caption(
+                "CSV checks confirm its contents and your stated expected count; "
+                "they cannot independently verify the live Scopus result set."
+            )
+        except ValueError as err:
+            st.error(f"CSV import rejected: {err}")
 
 with st.expander("Activity log"):
     st.code("\n".join(st.session_state.logs[-60:]), language="text")
