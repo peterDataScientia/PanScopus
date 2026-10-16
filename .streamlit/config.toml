@@ -1,0 +1,7 @@
+[server]
+address = "127.0.0.1"
+headless = false
+
+[theme]
+base = "dark"
+primaryColor = "#16A3B8"
