@@ -1,3 +1,14 @@
-<!doctype html><html><head><meta charset="utf-8">
-<style>body{min-width:280px;padding:12px;font:14px system-ui}h3{margin-top:0}p{line-height:1.5}</style>
-</head><body><h3>PanScopus Companion</h3><p>Open your PanScopus Streamlit Cloud app. The Companion adds a <b>Run Scopus Search + CSV</b> button below its query editor.</p><p>Runs only when you click the button. Uses your existing authorized Scopus Chrome session; never reads passwords or bypasses access controls.</p></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<style>
+body{width:325px;margin:0;padding:16px;font:14px system-ui,Arial,sans-serif;color:#17263b}
+h3{margin:0 0 8px}p{line-height:1.45}
+button{background:#1769aa;border:0;border-radius:7px;padding:11px;color:white;font-weight:700;width:100%;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}#status{margin-top:10px;min-height:30px}
+</style></head><body>
+<h3>PanScopus Companion</h3>
+<p>Open PanScopus Cloud, enter the advanced query, then run directly from this menu if its blue button is missing.</p>
+<button id="start">Run Search + Export + CSV Import</button>
+<p id="status" role="status">Ready to inspect the active PanScopus tab.</p>
+<script src="popup.js"></script>
+</body></html>
