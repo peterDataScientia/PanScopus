@@ -20,8 +20,11 @@ jobs:
       - name: Verify Chrome Companion JavaScript syntax
         run: |
           node --check chrome_companion/background.js
+          node --check chrome_companion/query_reader.js
           node --check chrome_companion/panscopus_content.js
           node --check chrome_companion/popup.js
           node --check chrome_companion/runner.js
+      - name: Test Streamlit query detection
+        run: node tests/test_query_reader.js
       - name: Run offline checks
         run: python -m unittest discover -s tests -v
