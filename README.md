@@ -1,17 +1,45 @@
-# PanScopus
+# PanScopus — Streamlit Cloud
 
-A local-first Streamlit research workbench for authorized Research4Life → Scopus searches and bibliographic CSV export.
+Streamlit research workbench for authorized Research4Life → Scopus Advanced Search → verified bibliographic CSV exports.
 
-## Run on Windows
+## Deploy on Streamlit Community Cloud (free)
 
-1. Clone or download this repository.
-2. Install: `python -m pip install -r requirements.txt`
-3. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and enter your **authorized** institutional username/password. Never commit this private file.
-4. Start: `python -m streamlit run app.py --server.address=127.0.0.1`
-5. Open `http://127.0.0.1:8501`.
+1. Deploy this repository using entrypoint `app.py`.
+2. Streamlit installs Python dependencies from `requirements.txt` and **Chromium + ChromeDriver** from `packages.txt` (allow time for system packages).
+3. In **Manage app → Settings → Secrets**, keep your existing Research4Life username and password and add an **independent app access PIN**. Example:
 
-Use **Connect → Search → Export CSV**. The same Chrome session remains open between actions. Export only records that your institutional license permits. Confirm that downloaded CSV rows match the Scopus result count. Scopus's CSV export interface can change and has not been tested end-to-end in this Streamlit wrapper.
+```toml
+[research4life]
+username = "YOUR_R4L_USERNAME"
+password = "YOUR_R4L_PASSWORD"
 
-**Security:** This app is designed for local Windows use. Do not deploy unchanged as a public multi-user service: Selenium sessions and institutional credentials need per-user isolation. Do not commit `.streamlit/secrets.toml`.
+[app]
+access_pin = "A_LONG_PRIVATE_PIN"
+```
 
-The `ScopusWorkbench` backend supports Research4Life Standard Login, the authenticated gateway, Advanced Search Monaco editor, checked CSV export ranges, and provenance logs. If Scopus's dialog changes, the app will refuse partial exports rather than report success.
+   Alternatively for existing deployments, top-level `R4L_USERNAME` and `R4L_PASSWORD` are also supported. **Never share institutional passwords or commit secrets to GitHub.**
+4. Reboot your deployed Streamlit app to install the Linux packages and reload the Secrets.
+5. Enter your app PIN, then click **Connect to Scopus → Run Search → Export all matching records**. A headless Chromium session is created on the server; exports can be downloaded in the UI.
+
+## Security
+
+The GitHub repository may be public, but **an anonymous public Streamlit app with institutional credentials is not secure**. Access to the app is blocked until `[app].access_pin` is set, and the PIN must be entered in each new browser session. Prefer making the deployed app private using **Streamlit Cloud → Settings → Sharing → Only specific people can view this app** too. Do not use the Research4Life password as the app PIN.
+
+## Notes and limitations
+
+- Linux headless Chromium is supported in the code; however institutional authentication in hosted environments depends on Research4Life/Scopus accepting Cloud browser access, which has not been verified end-to-end.
+- This app does **not** bypass institutional entitlement checks, CAPTCHAs or service rules.
+- The same Selenium Chrome session is kept between clicks within one connected Streamlit session. The Cloud instance may restart or run out of memory, invalidating the session.
+- The CSV export checks that the dialog targets the full record count. It refuses mismatched selections and compares actual CSV row count after download.
+- Exports are saved to temporary `exports/` on the Cloud server; download them before the server restarts.
+- There is no paid API or subscription dependency.
+- Tests validate the Python code and Streamlit startup, **not** the authenticated browser workflow.
+
+## Run locally (optional)
+
+```bash
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+`secrets.toml` is excluded by `.gitignore`.
