@@ -1,4 +1,21 @@
-# PanScopus — Streamlit Cloud
+# PanScopus — Automated Windows workflow (recommended)
+
+## Windows: one-click automated Scopus CSV export
+
+This is the recommended route while Scopus blocks the Streamlit Cloud server with Cloudflare. The **previous Windows Chrome workflow successfully exported 80/80 records** with authorized Research4Life access.
+
+**No Scopus API, Chrome extension, Streamlit Cloud or manual CSV export is required.**
+
+1. Download [the repository ZIP](https://github.com/peterDataScientia/PanScopus/archive/refs/heads/main.zip), extract it on Windows.
+2. **Double-click `RUN_WINDOWS_AUTO.bat`** to run Login → Advanced Search → CSV Export automatically, or run `PanScopus_Windows_Auto.ipynb` in Jupyter from the extracted repository folder.
+3. The default query is `sample_query.txt`. Enter Research4Life credentials privately when prompted (or set `R4L_USERNAME` and `R4L_PASSWORD` in your Windows environment). They are never committed or written to the exported CSV.
+4. The script checks the full document count in the Scopus CSV export dialog and verifies the downloaded file's rows. Output and diagnostic files are saved under `exports/`.
+
+Windows Chrome needs to be installed and the institution's Research4Life/Scopus access must be authorized. The fresh local code has offline checks only; live end-to-end verification still depends on running it in your Windows session.
+
+---
+
+## Historical Streamlit Cloud and Chrome Companion option
 
 ## Chrome Companion (no Scopus API, no local server)
 
