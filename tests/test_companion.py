@@ -54,6 +54,8 @@ class CompanionChecks(unittest.TestCase):
         app = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('st.text_area(', app)
         self.assertIn("Build: Chrome Companion v6.1", app)
+        self.assertIn("st.html(", app)
+        self.assertIn('id="panscopus-companion"', app)
         self.assertIn("parse_scopus_csv", app)
 
 
