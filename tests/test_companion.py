@@ -39,7 +39,7 @@ class CompanionChecks(unittest.TestCase):
         self.assertIn("query_reader.js", manifest["content_scripts"][0]["js"])
         self.assertIn("appTabId", background)
         self.assertIn("currentQueryField()", content)
-        self.assertIn('field.closest(', content)
+        self.assertIn('field?.closest(', content)
         self.assertNotIn('document.querySelector(marker)', content)
         popup = (EXT / "popup.js").read_text(encoding="utf-8")
         self.assertIn("PANSCOPUS_START", popup)
