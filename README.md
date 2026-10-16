@@ -1,5 +1,17 @@
 # PanScopus — Streamlit Cloud
 
+## No Scopus API or local server required
+
+PanScopus now presents a **browser-assisted workflow** first when deployed on Streamlit Cloud:
+
+1. Paste an Advanced Search query into PanScopus. Copy it using the query block's copy control.
+2. Click **Open Scopus Advanced Search**; it opens Scopus in the user's ordinary authorized browser session.
+3. If needed, authenticate through your institution's official Research4Life login. Search, then use Scopus's ordinary **Export → CSV** interface to save all selected documents.
+4. Return to PanScopus Cloud, upload the CSV and inspect row counts, abstracts, column completeness, DOI/EID duplicates, and the dataset preview.
+
+This workflow needs **no paid API, no local app, no local server, and no automation bypass**. It does still require using the Scopus site's native search/export UI. The hosted Selenium pathway remains under an optional expandable panel but cannot operate while Cloudflare blocks the Cloud server.
+
+
 Streamlit research workbench for authorized Research4Life → Scopus Advanced Search and bibliographic CSV processing. Automated browser access depends on Scopus permitting the hosted session.
 
 ## Deploy on Streamlit Community Cloud (free)
