@@ -157,6 +157,7 @@ export = st.session_state.last_export
 with st.sidebar:
     st.title("PanScopus")
     st.caption("Research4Life → Scopus · Cloud workbench")
+    st.caption("Build: Cloud navigation v3")
     if user and password:
         st.success("Secrets configured")
     else:
