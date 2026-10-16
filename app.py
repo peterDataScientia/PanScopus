@@ -191,7 +191,7 @@ if IS_HOSTED_LINUX:
         # extensions. st.html renders real DOM rather than Markdown markup.
         st.html('<div id="panscopus-companion" style="min-height:1px"></div>')
         st.caption(
-            "Chrome Companion v0.1.1 adds the Run button immediately below "
+            "Chrome Companion v0.1.2 adds the Run button immediately below "
             "the query field. If Chrome does not inject the button, click the "
             "PanScopus extension icon in the Chrome toolbar, then choose "
             "'Run Search + Export + CSV Import'. Keep this PanScopus tab open."
@@ -202,7 +202,7 @@ if IS_HOSTED_LINUX:
                 "(https://github.com/peterDataScientia/PanScopus/archive/refs/heads/main.zip), "
                 "extract it, then open Chrome `chrome://extensions`, enable "
                 "**Developer mode**, click **Load unpacked** and select the "
-                "`chrome_companion` folder. For v0.1.0 installations, replace the old extension folder with the latest v0.1.1 version and use Chrome Extensions → Reload. Return here and refresh. "
+                "`chrome_companion` folder. If you already installed v0.1.0 or v0.1.1, replace the old extension folder with the latest v0.1.2 version and use Chrome Extensions → Reload. Return here and refresh. "
                 "Only install code that you trust; the extension requests Chrome "
                 "debugging access to enter advanced queries into Scopus's Monaco editor."
             )
