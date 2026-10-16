@@ -362,16 +362,37 @@ class ScopusWorkbench:
 
     @staticmethod
     def _page_problem(state):
-        sample = (str(state.get("title", "")) + " " +
-                  str(state.get("body_excerpt", ""))).lower()
-        if any(s in sample for s in (
+        """Identify service-side access controls before treating them as UI failures."""
+        title = str(state.get("title", "")).lower()
+        body = str(state.get("body_excerpt", "")).lower()
+        if (
+            "cloudflare" in title
+            or "attention required" in title
+            or "sorry, you have been blocked" in body
+            or "cloudflare ray id" in body
+            or "checking if the site connection is secure" in body
+        ):
+            return (
+                "Scopus is showing a Cloudflare access challenge in the "
+                "Streamlit Cloud Chromium session. Research4Life authenticated, "
+                "but Scopus has not granted the hosted browser access to Advanced Search. "
+                "Waiting longer or changing Selenium selectors cannot resolve this "
+                "access restriction. Please use an authorized Scopus browser "
+                "to export CSV and upload it in PanScopus, or ask your institution/"
+                "Elsevier support about supported hosted access. "
+                "PanScopus will not bypass Cloudflare."
+            )
+        sample = title + " " + body
+        if any(word in sample for word in (
             "captcha", "verify you are human", "access denied",
             "unusual traffic", "automated requests", "not authorized",
             "please enable javascript", "permission denied",
         )):
-            return ("Scopus displayed an access/verification page, not its "
-                    "Advanced Search editor. This requires normal authorized "
-                    "access resolution; PanScopus will not bypass verification.")
+            return (
+                "Scopus displayed an access/verification page, not its "
+                "Advanced Search editor. It requires normal authorized "
+                "access resolution; PanScopus will not bypass verification."
+            )
         return None
 
     def _wait_for_editor(self, timeout=30):
