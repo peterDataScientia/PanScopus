@@ -1,6 +1,6 @@
 # PanScopus — Streamlit Cloud
 
-Streamlit research workbench for authorized Research4Life → Scopus Advanced Search → verified bibliographic CSV exports.
+Streamlit research workbench for authorized Research4Life → Scopus Advanced Search and bibliographic CSV processing. Automated browser access depends on Scopus permitting the hosted session.
 
 ## Deploy on Streamlit Community Cloud (free)
 
@@ -19,7 +19,7 @@ access_pin = "A_LONG_PRIVATE_PIN"
 
    Alternatively for existing deployments, top-level `R4L_USERNAME` and `R4L_PASSWORD` are also supported. **Never share institutional passwords or commit secrets to GitHub.**
 4. Reboot your deployed Streamlit app to install the Linux packages and reload the Secrets.
-5. Enter your app PIN, then click **Connect to Scopus → Run Search → Export all matching records**. A headless Chromium session is created on the server; exports can be downloaded in the UI.
+5. Enter your app PIN. If Scopus accepts the Cloud Chromium session, click **Connect to Scopus → Run Search → Export all matching records**. Otherwise use **Import authorized Scopus CSV** with a CSV exported from an ordinary institutionally authorized Scopus session.
 
 ## Security
 
@@ -27,7 +27,9 @@ The GitHub repository may be public, but **an anonymous public Streamlit app wit
 
 ## Notes and limitations
 
-- Linux headless Chromium is supported in the code; however institutional authentication in hosted environments depends on Research4Life/Scopus accepting Cloud browser access, which has not been verified end-to-end.
+- **Cloudflare blocked Scopus in the 2026-10-16 hosted-session test.** Research4Life authentication succeeded, but Scopus returned `Attention Required! | Cloudflare` instead of Advanced Search. This is an access challenge, not a Monaco editor or Selenium timing issue. The app detects this and stops promptly; it does not bypass Cloudflare.
+- **Supported fallback on Streamlit Cloud:** export CSV from a browser where you are authorized to use Scopus; upload that CSV to step 04. The app checks the row count and metadata. This is not equivalent to live automated Scopus querying.
+- Linux headless Chromium is installed, but permission to access Scopus from a hosted environment depends on Scopus and your institution.
 - This app does **not** bypass institutional entitlement checks, CAPTCHAs or service rules.
 - The same Selenium Chrome session is kept between clicks within one connected Streamlit session. The Cloud instance may restart or run out of memory, invalidating the session.
 - The CSV export checks that the dialog targets the full record count. It refuses mismatched selections and compares actual CSV row count after download.
