@@ -17,7 +17,8 @@ start.addEventListener("click",async()=>{
       files:["query_reader.js"]
     });
     const candidates=results.map(row=>row.result).filter(Boolean);
-    const found=candidates.find(item=>item.app&&item.query);
+    const located=results.find(row=>row.result?.app&&row.result?.query);
+    const found=located?.result;
     if(!found){
       const diagnostics=candidates.map(x=>
         "app="+!!x.app+" textarea="+(x.editors||0)+
@@ -30,7 +31,8 @@ start.addEventListener("click",async()=>{
       );
     }
     const reply=await chrome.runtime.sendMessage({
-      type:"PANSCOPUS_START",appTabId:tab.id,query:found.query
+      type:"PANSCOPUS_START",appTabId:tab.id,
+      appFrameId:located.frameId,query:found.query
     });
     if(!reply?.ok)throw new Error(reply?.error||"Runner did not open");
     status.textContent="Found query in "+found.source+
