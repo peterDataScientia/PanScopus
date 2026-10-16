@@ -1,0 +1,1 @@
+TITLE-ABS-KEY(("green synthesis" OR "plant-mediated" OR phytogenic) AND nanoparticle* AND antibiotic* AND (synerg* OR potentiation OR combination) AND (MDR OR "multidrug resistant" OR MRSA OR ESBL))
