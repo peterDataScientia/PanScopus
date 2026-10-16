@@ -28,6 +28,7 @@ class CompanionChecks(unittest.TestCase):
             self.assertTrue((EXT / filename).exists(), filename)
 
     def test_companion_not_enabled_without_click(self):
+        manifest = json.loads((EXT / "manifest.json").read_text(encoding="utf-8"))
         content = (EXT / "panscopus_content.js").read_text(encoding="utf-8")
         background = (EXT / "background.js").read_text(encoding="utf-8")
         self.assertIn("button.addEventListener(\"click\"", content)
