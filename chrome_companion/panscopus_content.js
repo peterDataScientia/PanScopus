@@ -1,70 +1,133 @@
 "use strict";
 (() => {
-  const marker = "#panscopus-companion";
-  const hostname = location.hostname;
-  if (!hostname.endsWith(".streamlit.app")) return;
-  let working = false;
+  const host = location.hostname.toLowerCase();
+  if (!(host.endsWith(".streamlit.app") || host === "share.streamlit.io")) return;
 
+  const QUERY_SELECTORS = [
+    'textarea[aria-label="Scopus advanced query"]',
+    'textarea[aria-label="Advanced Scopus query"]',
+    '[data-testid="stTextArea"] textarea'
+  ];
+
+  // HTML inserted with st.markdown(unsafe_allow_html=True) can be moved or
+  // sanitized by Streamlit. Never rely on that marker being present.
+  function currentQueryField() {
+    const byLabel = QUERY_SELECTORS.slice(0, 2)
+      .map(selector => document.querySelector(selector))
+      .find(Boolean);
+    if (byLabel) return byLabel;
+    const fallback = document.querySelector(QUERY_SELECTORS[2]);
+    return fallback &&
+      /panscopus/i.test(document.title || "") ? fallback : null;
+  }
+  function isPanScopus() {
+    const title = document.title || "";
+    const headings = [...document.querySelectorAll("h1,h2")]
+      .some(node => node.textContent?.trim() === "PanScopus");
+    return (/panscopus/i.test(title) || headings) &&
+      !!currentQueryField();
+  }
+
+  let working = false;
+  let nextFrame = 0;
   function ensureButton() {
-    const point = document.querySelector(marker);
-    if (!point || document.getElementById("panscopus-companion-button")) return;
-    const host = document.createElement("div");
-    host.id = "panscopus-companion-controls";
-    host.style.cssText = "margin:12px 0;padding:12px;border:1px solid #b0b8c6;border-radius:8px;";
-    const btn = document.createElement("button");
-    btn.id = "panscopus-companion-button";
-    btn.type = "button";
-    btn.textContent = "Run Scopus Search + CSV via Chrome Companion";
-    btn.style.cssText = "padding:12px 18px;background:#1769aa;color:white;border:0;border-radius:7px;cursor:pointer;font-weight:600;width:100%;";
-    const note = document.createElement("div");
-    note.id = "panscopus-companion-note";
-    note.style.cssText = "font-size:13px;margin-top:8px;";
-    note.textContent = "Uses the authorized Chrome session, without Scopus API or server-side headless Chromium.";
-    host.append(btn, note);
-    point.appendChild(host);
-    btn.addEventListener("click", async () => {
+    if (!isPanScopus()) return;
+    const field = currentQueryField();
+    if (!field) return;
+    const existing = document.getElementById("panscopus-companion-button");
+    if (existing && existing.isConnected) return;
+
+    // Streamlit's widget container is stable during ordinary rerenders.
+    const anchor = field.closest('[data-testid="stTextArea"], .stTextArea')
+      || field.parentElement;
+    if (!anchor) return;
+
+    const box = document.createElement("div");
+    box.id = "panscopus-companion-controls";
+    box.style.cssText =
+      "margin:12px 0;padding:12px;border:1px solid #aab9cd;" +
+      "border-radius:8px;background:transparent;";
+
+    const button = document.createElement("button");
+    button.id = "panscopus-companion-button";
+    button.type = "button";
+    button.textContent = "Run Scopus Search + CSV via Chrome Companion";
+    button.style.cssText =
+      "padding:12px 18px;background:#1769aa;color:white;border:0;" +
+      "border-radius:7px;cursor:pointer;font-weight:600;width:100%;";
+
+    const status = document.createElement("div");
+    status.id = "panscopus-companion-note";
+    status.style.cssText = "font-size:13px;margin-top:8px;";
+    status.textContent =
+      "Runs in your authorized Chrome session without a Scopus API.";
+
+    box.append(button, status);
+    anchor.insertAdjacentElement("afterend", box);
+    button.addEventListener("click", async () => {
       if (working) return;
-      const input = document.querySelector('textarea[aria-label="Scopus advanced query"]')
-        || document.querySelector(".stTextArea textarea");
-      const query = (input?.value || "").trim();
-      if (!query) { note.textContent = "Enter the query above before running."; return; }
+      const current = currentQueryField();
+      const query = String(current?.value || "").trim();
+      if (!query) {
+        status.textContent = "Enter an advanced Scopus query first.";
+        return;
+      }
       working = true;
-      btn.disabled = true;
-      note.textContent = "Opening the Companion runner…";
+      button.disabled = true;
+      status.textContent = "Opening the Companion runner…";
       try {
-        const response = await chrome.runtime.sendMessage({type:"PANSCOPUS_START", query});
-        if (!response?.ok) throw new Error(response?.error || "Cannot open companion");
-        note.textContent = "Companion runner opened in a new tab. Keep this PanScopus tab available.";
-      } catch (err) {
-        note.textContent = "Companion error: " + String(err.message || err);
+        const reply = await chrome.runtime.sendMessage({
+          type: "PANSCOPUS_START", query
+        });
+        if (!reply?.ok) throw new Error(reply?.error || "Companion unavailable");
+        status.textContent = "Companion runner opened in another tab.";
+      } catch (error) {
+        status.textContent = "Companion error: " +
+          String(error.message || error);
       } finally {
         working = false;
-        btn.disabled = false;
+        button.disabled = false;
       }
     });
   }
-  ensureButton();
-  const observer = new MutationObserver(ensureButton);
-  observer.observe(document.documentElement, {childList:true,subtree:true});
 
+  function scheduleEnsure() {
+    if (nextFrame) return;
+    nextFrame = requestAnimationFrame(() => {
+      nextFrame = 0;
+      ensureButton();
+    });
+  }
+  scheduleEnsure();
+  const observer = new MutationObserver(scheduleEnsure);
+  observer.observe(document.documentElement, {
+    childList: true, subtree: true
+  });
+
+  // The upload can be delivered even if Streamlit omitted the HTML marker.
   chrome.runtime.onMessage.addListener((msg, sender, respond) => {
     if (msg?.type !== "PANSCOPUS_IMPORT_CSV") return;
     try {
-      if (!document.querySelector(marker)) throw new Error("PanScopus Companion section missing");
-      if (msg.appUrl !== location.href) throw new Error("PanScopus tab URL changed");
-      const input = document.querySelector('input[type="file"]');
-      if (!input) throw new Error("Open the CSV Import section in PanScopus first");
+      if (!isPanScopus()) throw new Error("Not a PanScopus page");
+      if (msg.appUrl !== location.href)
+        throw new Error("PanScopus tab URL changed");
+      const input = document.querySelector(
+        '[data-testid="stFileUploader"] input[type="file"],' +
+        'input[type="file"]'
+      );
+      if (!input) throw new Error("PanScopus CSV uploader not found");
       const name = String(msg.name || "scopus.csv");
       if (!/\.csv$/i.test(name)) throw new Error("Expected a CSV download");
       const csv = String(msg.text || "");
-      if (!csv || csv.length > 32000000) throw new Error("CSV missing or too large");
-      const data = new DataTransfer();
-      data.items.add(new File([csv], name, {type:"text/csv"}));
-      input.files = data.files;
-      input.dispatchEvent(new Event("change", {bubbles:true}));
-      respond({ok:true});
-    } catch (err) {
-      respond({ok:false,error:String(err.message || err)});
+      if (!csv || csv.length > 32000000)
+        throw new Error("CSV missing or too large");
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([csv], name, {type: "text/csv"}));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event("change", {bubbles: true}));
+      respond({ok: true});
+    } catch (error) {
+      respond({ok: false, error: String(error.message || error)});
     }
   });
 })();
