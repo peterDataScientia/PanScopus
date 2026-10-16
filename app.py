@@ -158,7 +158,7 @@ export = st.session_state.last_export
 with st.sidebar:
     st.title("PanScopus")
     st.caption("Research4Life → Scopus · Cloud workbench")
-    st.caption("Build: Browser-assisted v5")
+    st.caption("Build: Chrome Companion v6")
     if user and password:
         st.success("Secrets configured")
     else:
@@ -173,35 +173,47 @@ with st.sidebar:
     st.caption("Institutional credentials are not shown, saved in logs, or included in exports.")
 
 st.title("PanScopus")
-st.caption("Research4Life · Scopus advanced searches · Bibliographic CSV")
+st.caption("Research4Life · Automated Scopus Search · Verified CSV Export")
 if IS_HOSTED_LINUX:
     st.info(
-        "No Scopus API needed. Scopus blocked this cloud server's Chromium with "
-        "Cloudflare, so use your institutionally authorized browser for search/export. "
-        "You can import and inspect the resulting CSV here."
+        "Browser Companion: runs Search → CSV Export through your authorized "
+        "Chrome browser, not the Scopus-blocked Cloud Chromium. "
+        "No Scopus API or local server is required."
     )
     with st.container(border=True):
-        st.subheader("01 · Search in your browser")
+        st.subheader("01 · Automated Scopus Search + Export")
         st.text_area(
             "Scopus advanced query",
             height=155,
             key="query",
-            help="Prepare your advanced search here. Use the Copy icon on the query block below.",
         )
-        st.caption("Copy the query from this block, then open Scopus Advanced Search.")
-        st.code(st.session_state.query, language="text")
-        st.link_button(
-            "Open Scopus Advanced Search",
-            url=ADVANCED_URL,
-            use_container_width=True,
-            type="primary",
+        st.markdown(
+            '<div id="panscopus-companion" data-panscopus-companion="1"></div>',
+            unsafe_allow_html=True,
         )
         st.caption(
-            "If Scopus requests authentication, follow your normal Research4Life "
-            "sign-in. Paste the query, run Search, select all matching documents "
-            "in Scopus's export dialog, choose CSV, and download. "
-            "Then upload the file below. No local server or API required."
+            "After the Chrome Companion is installed, its Run button appears "
+            "above. The first run asks you to select Chrome's Downloads folder "
+            "for automatic CSV import. Scopus login must already be authorized "
+            "in your normal Chrome session."
         )
+        with st.expander("Install Companion (one time)"):
+            st.markdown(
+                "Download the [PanScopus repository]"
+                "(https://github.com/peterDataScientia/PanScopus/archive/refs/heads/main.zip), "
+                "extract it, then open Chrome `chrome://extensions`, enable "
+                "**Developer mode**, click **Load unpacked** and select the "
+                "`chrome_companion` folder. Return here and refresh. "
+                "Only install code that you trust; the extension requests Chrome "
+                "debugging access to enter advanced queries into Scopus's Monaco editor."
+            )
+        with st.expander("Browser-only fallback"):
+            st.code(st.session_state.query, language="text")
+            st.link_button(
+                "Open Scopus Advanced Search",
+                url=ADVANCED_URL,
+                use_container_width=True,
+            )
 
 with (st.expander("Optional: Retry automated Scopus browser (Cloudflare currently blocks hosted access)", expanded=False) if IS_HOSTED_LINUX else st.container()):
     with st.container(border=True):
