@@ -1,6 +1,5 @@
-[server]
-address = "127.0.0.1"
-headless = false
+# Keep the web server binding and port controlled by the deployment platform.
+# For local-only use, run: streamlit run app.py --server.address=127.0.0.1
 
 [theme]
 base = "dark"
