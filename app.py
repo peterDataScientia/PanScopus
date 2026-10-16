@@ -187,6 +187,9 @@ if IS_HOSTED_LINUX:
             height=155,
             key="query",
         )
+        # Backward-compatible insertion point for already installed v0.1.0
+        # extensions. st.html renders real DOM rather than Markdown markup.
+        st.html('<div id="panscopus-companion" style="min-height:1px"></div>')
         st.caption(
             "Chrome Companion v0.1.1 adds the Run button immediately below "
             "the query field. If Chrome does not inject the button, click the "
