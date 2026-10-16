@@ -1,12 +1,15 @@
 """PanScopus Selenium backend for authorized Research4Life and Scopus use.
 
-Local single-user Chrome automation. No credentials/session cookies written to disk.
+Single-user Chrome or headless Chromium automation. No credentials/session cookies written to disk.
 """
 from __future__ import annotations
 
 import csv
 import json
+import os
 import re
+import shutil
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,6 +24,7 @@ from selenium.common.exceptions import (
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 
 LOGIN_URL = "https://login.research4life.org/tacgw/login.cshtml"
@@ -131,14 +135,69 @@ class ScopusWorkbench:
         ) or ""
 
     def _start_browser(self):
+        """Start a separate Chrome/Chromium browser for this user's session.
+
+        Streamlit Community Cloud runs Debian without a desktop display.
+        packages.txt installs the matching Chromium and ChromeDriver.
+        """
         opts = webdriver.ChromeOptions()
-        opts.add_argument("--start-maximized")
+        opts.add_argument("--window-size=1600,1050")
+        opts.add_argument("--disable-popup-blocking")
         opts.add_experimental_option("prefs", {
             "download.default_directory": str(self.output_dir),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
         })
-        self.driver = webdriver.Chrome(options=opts)
+
+        if sys.platform.startswith("linux"):
+            opts.add_argument("--headless=new")
+            opts.add_argument("--no-sandbox")
+            opts.add_argument("--disable-dev-shm-usage")
+            opts.add_argument("--disable-gpu")
+            opts.add_argument("--disable-extensions")
+            opts.add_argument("--remote-debugging-pipe")
+            chromium = (
+                shutil.which("chromium")
+                or shutil.which("chromium-browser")
+                or shutil.which("google-chrome")
+                or shutil.which("google-chrome-stable")
+            )
+            if chromium is None:
+                raise RuntimeError(
+                    "Chromium is missing from the Cloud container. "
+                    "Make sure packages.txt includes 'chromium' and reboot the app."
+                )
+            opts.binary_location = chromium
+            driver_path = shutil.which("chromedriver")
+            self.log("Starting headless Chromium on Streamlit Cloud")
+        else:
+            opts.add_argument("--start-maximized")
+            driver_path = None
+            self.log("Starting Chrome browser")
+
+        try:
+            if driver_path:
+                self.driver = webdriver.Chrome(
+                    service=Service(executable_path=driver_path),
+                    options=opts,
+                )
+            else:
+                self.driver = webdriver.Chrome(options=opts)
+        except WebDriverException as exc:
+            raise RuntimeError(
+                "Chrome could not start. On Streamlit Cloud, verify that "
+                "packages.txt installs both chromium and chromium-driver. "
+                "Details: " + str(exc)[:600]
+            ) from exc
+
+        try:
+            self.driver.execute_cdp_cmd(
+                "Page.setDownloadBehavior",
+                {"behavior": "allow", "downloadPath": str(self.output_dir)},
+            )
+        except WebDriverException:
+            # Chrome's download prefs are used when Page domain is unavailable.
+            pass
         self.last_search = None
 
     def _login(self, username, password):
