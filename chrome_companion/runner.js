@@ -86,6 +86,7 @@ function scopusDOM(op,arg){
         /sorry, you have been blocked/i.test(body),
       editor:!!root(),searchId:/[?&]searchid=/i.test(location.search),
       queryVisible:/advanced query/i.test(body),
+      queryMatches:!!arg && body.replace(/\s+/g,"").toUpperCase().includes(String(arg).replace(/\s+/g,"").toUpperCase()),
       count:c?Number(c[1].replace(/,/g,"")):null
     };
   }
@@ -158,6 +159,13 @@ function scopusDOM(op,arg){
     target.focus();target.click();
     return {ok:document.activeElement===target};
   }
+  if(op==="commitTo"){
+    const e=document.activeElement;
+    if(!e || !e.matches("input"))return {ok:false};
+    e.dispatchEvent(new Event("change",{bubbles:true}));
+    e.blur();
+    return {ok:true};
+  }
   if(op==="selectMetadata"){
     const m=modal();if(!m)return {ok:false};
     const checks=[...m.querySelectorAll('input[type="checkbox"],[role="checkbox"]')];
@@ -201,7 +209,7 @@ async function until(check,ms,description){
   throw new Error(description+" timed out"+(last?": "+last.message:""));
 }
 async function state(){
-  const s=await page("state");
+  const s=await page("state",job?.query||"");
   if(s?.blocked)throw new Error("Scopus access challenge detected in this browser; Companion cannot bypass it.");
   return s;
 }
@@ -236,7 +244,7 @@ async function performSearch(){
   log("Search submitted; waiting for matching documents…");
   const results=await until(async()=>{
     const r=await state();
-    return r?.searchId&&r?.queryVisible&&Number.isInteger(r.count)?r:null;
+    return r?.searchId&&r?.queryVisible&&r?.queryMatches&&Number.isInteger(r.count)?r:null;
   },110000,"Scopus results");
   if(results.count<=0||results.count>2000)
     throw new Error("Search document count is outside export range: "+results.count);
@@ -258,6 +266,8 @@ async function prepareCsv(total){
     if(!(await page("rangeOption"))?.ok)throw new Error("Full document range selector missing");
     await until(async()=>(await page("focusTo"))?.ok,10000,"CSV To field");
     await typeNative(String(total));
+    // React often commits range input on blur, not on each keypress.
+    await page("commitTo");
     await until(async()=>(await page("dialogCount"))===total,15000,"CSV full range");
     count=await page("dialogCount");
   }
