@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import platform
 from pathlib import Path
 
 import streamlit as st
@@ -29,6 +30,7 @@ if "last_export" not in st.session_state:
     st.session_state.last_export = None
 
 client = st.session_state.client
+LOCAL_CHROME_SUPPORTED = platform.system() == "Windows"
 
 
 def configured_credentials():
@@ -90,11 +92,13 @@ with st.sidebar:
 
 st.title("PanScopus")
 st.caption("Research4Life authentication · Advanced document search · Verified CSV export")
+if not LOCAL_CHROME_SUPPORTED:
+    st.warning("This hosted/Linux environment is a UI preview. The connected Research4Life/Scopus Selenium browser requires local Windows Chrome. Do not place institutional credentials in a public Cloud app.")
 
 with st.container(border=True):
     st.subheader("01 · Connect")
     st.write("Open Research4Life Standard Login and navigate to Scopus Advanced Search.")
-    if st.button("Connect to Scopus", type="primary", disabled=not(user and password)):
+    if st.button("Connect to Scopus", type="primary", disabled=not(user and password and LOCAL_CHROME_SUPPORTED)):
         if run_action("Connecting to Scopus", lambda: client.connect(user, password)) is not None:
             st.success("Scopus Advanced Search is ready.")
 
@@ -104,9 +108,9 @@ with st.container(border=True):
     a, b = st.columns([2, 1])
     with a:
         clicked = st.button("Run search", use_container_width=True,
-                            type="primary", disabled=not connected or not st.session_state.query.strip())
+                            type="primary", disabled=not LOCAL_CHROME_SUPPORTED or not connected or not st.session_state.query.strip())
     with b:
-        go_back = st.button("Back to Advanced Search", use_container_width=True, disabled=not connected)
+        go_back = st.button("Back to Advanced Search", use_container_width=True, disabled=not LOCAL_CHROME_SUPPORTED or not connected)
     if clicked:
         result = run_action("Running search", lambda: client.search(st.session_state.query))
         if result is not None:
@@ -128,7 +132,7 @@ with st.container(border=True):
     if count > MAX_CSV_EXPORT:
         st.warning(f"{count:,} records exceed the {MAX_CSV_EXPORT:,} per-export CSV limit; partition the query.")
     if st.button("Export all matching records", type="primary", use_container_width=True,
-                 disabled=not connected or not (0 < count <= MAX_CSV_EXPORT)):
+                 disabled=not LOCAL_CHROME_SUPPORTED or not connected or not (0 < count <= MAX_CSV_EXPORT)):
         result = run_action("Exporting CSV", client.export_csv)
         if result is not None:
             st.session_state.last_export = result
