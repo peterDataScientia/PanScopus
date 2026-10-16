@@ -12,9 +12,13 @@ start.addEventListener("click",async()=>{
 
     // Inject a deterministic reader in every permitted Streamlit frame.
     // Do not assume that the query input is a textarea in the main frame.
-    const results=await chrome.scripting.executeScript({
+    await chrome.scripting.executeScript({
       target:{tabId:tab.id,allFrames:true},
       files:["query_reader.js"]
+    });
+    const results=await chrome.scripting.executeScript({
+      target:{tabId:tab.id,allFrames:true},
+      func:()=>globalThis.panScopusReadQuery?.(document)||null
     });
     const candidates=results.map(row=>row.result).filter(Boolean);
     const located=results.find(row=>row.result?.app&&row.result?.query);
