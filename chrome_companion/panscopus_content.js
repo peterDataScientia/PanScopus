@@ -17,15 +17,16 @@
       .find(Boolean);
     if (byLabel) return byLabel;
     const fallback = document.querySelector(QUERY_SELECTORS[2]);
-    return fallback &&
-      /panscopus/i.test(document.title || "") ? fallback : null;
+    return fallback && /panscopus/i.test(document.title || "")
+      ? fallback : null;
+  }
+  function queryInfo() {
+    return globalThis.panScopusReadQuery?.(document) ||
+      {query:"",app:false,source:"query reader missing"};
   }
   function isPanScopus() {
-    const title = document.title || "";
-    const headings = [...document.querySelectorAll("h1,h2")]
-      .some(node => node.textContent?.trim() === "PanScopus");
-    return (/panscopus/i.test(title) || headings) &&
-      !!currentQueryField();
+    const data=queryInfo();
+    return !!data.app && !!data.query;
   }
 
   let working = false;
@@ -33,13 +34,16 @@
   function ensureButton() {
     if (!isPanScopus()) return;
     const field = currentQueryField();
-    if (!field) return;
     const existing = document.getElementById("panscopus-companion-button");
     if (existing && existing.isConnected) return;
 
-    // Streamlit's widget container is stable during ordinary rerenders.
-    const anchor = field.closest('[data-testid="stTextArea"], .stTextArea')
-      || field.parentElement;
+    // The Streamlit value may be mirrored only in the rendered st.code panel.
+    // In that case insert the Run control next to the code panel itself.
+    const code = document.querySelector('[data-testid="stCodeBlock"]') ||
+      document.querySelector("pre");
+    const anchor = field?.closest('[data-testid="stTextArea"], .stTextArea') ||
+      field?.parentElement || code?.closest('[data-testid="stCodeBlock"]') ||
+      code || document.querySelector("h1");
     if (!anchor) return;
 
     const box = document.createElement("div");
@@ -66,10 +70,11 @@
     anchor.insertAdjacentElement("afterend", box);
     button.addEventListener("click", async () => {
       if (working) return;
-      const current = currentQueryField();
-      const query = String(current?.value || "").trim();
+      const extracted=queryInfo();
+      const query=String(extracted.query || "").trim();
       if (!query) {
-        status.textContent = "Enter an advanced Scopus query first.";
+        status.textContent="Companion could not read the visible query (source: "+
+          extracted.source+"). Try the extension toolbar.";
         return;
       }
       working = true;
