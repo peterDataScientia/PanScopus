@@ -32,10 +32,17 @@ client = st.session_state.client
 
 
 def configured_credentials():
+    """Missing or malformed secrets must NEVER crash the Streamlit UI."""
     try:
         credentials = st.secrets["research4life"]
-        return str(credentials["username"]).strip(), str(credentials["password"])
-    except (FileNotFoundError, KeyError, TypeError):
+        username = str(credentials.get("username", "")).strip()
+        password = str(credentials.get("password", ""))
+        if username.startswith("YOUR_") or password.startswith("YOUR_"):
+            return "", ""
+        return username, password
+    except Exception:
+        # Streamlit may raise StreamlitSecretNotFoundError when secrets
+        # are absent. This is not always a FileNotFoundError subclass.
         return "", ""
 
 
@@ -71,7 +78,7 @@ with st.sidebar:
     if user and password:
         st.success("Secrets configured")
     else:
-        st.warning("Configure .streamlit/secrets.toml")
+        st.warning("Configure Research4Life credentials in Streamlit Secrets (cloud) or .streamlit/secrets.toml (local)")
     st.write("🟢 Scopus connected" if connected else "⚪ Browser disconnected")
     if last:
         st.metric("Matching documents", last.count)
@@ -148,4 +155,4 @@ with st.expander("Activity log"):
     st.code("\n".join(st.session_state.logs[-60:]), language="text")
     st.caption(f"Local export folder: {OUTPUT}")
 
-st.caption("Local Windows Chrome automation; authorized institutional access required. Not multi-user cloud deployment.")
+st.caption("The interface can load on Streamlit Cloud, but authenticated Selenium browser automation is supported for local Windows use only; cloud execution has not been validated.")
