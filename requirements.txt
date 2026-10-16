@@ -1,0 +1,2 @@
+streamlit>=1.40,<2
+selenium>=4.25,<5
