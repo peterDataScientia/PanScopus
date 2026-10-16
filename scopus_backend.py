@@ -275,7 +275,8 @@ class ScopusWorkbench:
         )
         if not self.is_scopus():
             raise PermissionError("Scopus is unavailable through the authenticated institution")
-        self.log("Scopus opened")
+        self.log("Scopus site reached: " + self.driver.current_url)
+        self.log("Checking Advanced Search editor next")
 
     def connect(self, username="", password=""):
         if not self.session_alive():
@@ -324,13 +325,139 @@ class ScopusWorkbench:
         ):
             raise RuntimeError("Advanced query editor did not receive focus")
 
+    def _scopus_state(self):
+        """Small, non-credential diagnostic for the currently visible Scopus page."""
+        if not self.is_scopus():
+            return {"url": self.driver.current_url, "title": "Not at Scopus"}
+        try:
+            state = self.driver.execute_script("""
+                const body=document.body?.innerText||'';
+                return {
+                    url: location.href,
+                    title: document.title,
+                    ready_state: document.readyState,
+                    body_length: body.length,
+                    body_excerpt: body.slice(0, 900),
+                    monaco_nodes: document.querySelectorAll('.monaco-editor').length,
+                    search_links: [...document.querySelectorAll('a,button')]
+                        .filter(e => /advanced|search/i.test(
+                            e.getAttribute('aria-label') || e.innerText || ''
+                        ))
+                        .slice(0, 12)
+                        .map(e => (e.getAttribute('aria-label') || e.innerText || '')
+                            .trim().slice(0, 80))
+                };
+            """)
+            return state if isinstance(state, dict) else {}
+        except WebDriverException:
+            return {"url": self.driver.current_url, "title": "Unavailable"}
+
+    @staticmethod
+    def _page_problem(state):
+        sample = (str(state.get("title", "")) + " " +
+                  str(state.get("body_excerpt", ""))).lower()
+        if any(s in sample for s in (
+            "captcha", "verify you are human", "access denied",
+            "unusual traffic", "automated requests", "not authorized",
+            "please enable javascript", "permission denied",
+        )):
+            return ("Scopus displayed an access/verification page, not its "
+                    "Advanced Search editor. This requires normal authorized "
+                    "access resolution; PanScopus will not bypass verification.")
+        return None
+
+    def _wait_for_editor(self, timeout=30):
+        stop = time.monotonic() + timeout
+        while time.monotonic() < stop:
+            try:
+                if self._editor() is not None:
+                    return True
+                state = self._scopus_state()
+                reason = self._page_problem(state)
+                if reason:
+                    raise PermissionError(reason)
+            except (StaleElementReferenceException, WebDriverException):
+                pass
+            time.sleep(1)
+        return False
+
+    def _click_advanced_link(self):
+        """Follow Scopus's visible Advanced Search control when deep links fail."""
+        candidates = [
+            (By.XPATH, "//a[contains(translate(normalize-space(.),"
+             "'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),"
+             "'advanced search')]"),
+            (By.XPATH, "//button[contains(translate(normalize-space(.),"
+             "'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),"
+             "'advanced search')]"),
+            (By.XPATH, "//*[@role='link' and contains("
+             "translate(@aria-label,'ABCDEFGHIJKLMNOPQRSTUVWXYZ',"
+             "'abcdefghijklmnopqrstuvwxyz'),'advanced')]"),
+            (By.XPATH, "//*[@role='button' and contains("
+             "translate(@aria-label,'ABCDEFGHIJKLMNOPQRSTUVWXYZ',"
+             "'abcdefghijklmnopqrstuvwxyz'),'advanced')]"),
+        ]
+        element = self._find(candidates, timeout=4, required=False)
+        if element is None:
+            return False
+        before = set(self.driver.window_handles)
+        self._click(element)
+        self._follow_tab(before, timeout=3)
+        return True
+
     def return_to_advanced(self):
         if not self.is_scopus():
             raise RuntimeError("Connect to Scopus first")
-        if "type=advanced" not in self.driver.current_url.lower() or not self._editor():
+
+        if self._editor() is not None:
+            self.log("Advanced Search editor already ready")
+            return self.driver.current_url
+
+        self.log("Opening Scopus Advanced Search")
+        if "type=advanced" not in self.driver.current_url.lower():
             self.driver.get(ADVANCED_URL)
-        WebDriverWait(self.driver, 55).until(lambda d: self._editor() is not None)
-        return self.driver.current_url
+
+        if self._wait_for_editor(32):
+            self.log("Advanced Search editor loaded")
+            return self.driver.current_url
+
+        first = self._scopus_state()
+        self.log(
+            "Advanced editor not found after direct navigation. "
+            "URL=" + str(first.get("url", "")) +
+            "; page=" + str(first.get("title", ""))
+        )
+
+        # Some Scopus sessions create a client-side navigation state
+        # only after visiting the Search page from the site menu.
+        # This uses ordinary first-party navigation, not a bypass.
+        self.log("Trying Scopus Search page and its Advanced Search link")
+        for url in (
+            "https://www.scopus.com/pages/home#basic",
+            "https://www.scopus.com/pages/search/publications?type=basic",
+        ):
+            self.driver.get(url)
+            self.log("Scopus navigation: " + self.driver.current_url)
+            if self._wait_for_editor(10):
+                self.log("Advanced Search editor loaded")
+                return self.driver.current_url
+            if self._click_advanced_link() and self._wait_for_editor(20):
+                self.log("Advanced Search editor loaded through site link")
+                return self.driver.current_url
+
+        final = self._scopus_state()
+        self.log(
+            "Advanced Search unresolved. URL=" + str(final.get("url", "")) +
+            "; title=" + str(final.get("title", "")) +
+            "; DOM ready=" + str(final.get("ready_state", "")) +
+            "; Monaco nodes=" + str(final.get("monaco_nodes", 0))
+        )
+        raise RuntimeError(
+            self._page_problem(final)
+            or "Scopus Advanced Search editor did not load in Cloud Chromium. "
+               "Check the diagnostic screenshot and page-state JSON below; "
+               "the Research4Life login succeeded, but the editor is not yet accessible."
+        )
 
     def _results_match(self, query):
         return (
@@ -659,11 +786,18 @@ class ScopusWorkbench:
         png = self.output_dir / f"scopus_{label}_{stamp}.png"
         details = self.output_dir / f"scopus_{label}_{stamp}.json"
         self.driver.save_screenshot(str(png))
-        details.write_text(json.dumps({
-            "url":self.driver.current_url, "dialog_count":self._dialog_total(),
-            "timestamp":stamp,
-        }, indent=2), encoding="utf-8")
-        return str(png),str(details)
+        state = self._scopus_state()
+        state.update({
+            "diagnostic_timestamp": stamp,
+            "expected_advanced_url": ADVANCED_URL,
+            "visible_editor": self._editor() is not None,
+            "dialog_count": self._dialog_total(),
+        })
+        details.write_text(
+            json.dumps(state, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return str(png), str(details)
 
     def close(self):
         if self.session_alive():
