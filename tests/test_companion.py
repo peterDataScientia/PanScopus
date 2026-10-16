@@ -30,9 +30,9 @@ class CompanionChecks(unittest.TestCase):
     def test_companion_not_enabled_without_click(self):
         content = (EXT / "panscopus_content.js").read_text(encoding="utf-8")
         background = (EXT / "background.js").read_text(encoding="utf-8")
-        self.assertIn("btn.addEventListener(\"click\"", content)
+        self.assertIn("button.addEventListener(\"click\"", content)
         self.assertIn("PANSCOPUS_START", content)
-        self.assertIn("sender.tab.url", background)
+        self.assertIn("appTab.url", background)
         self.assertIn("panscopusJob", background)
         self.assertIn("appTabId", background)
         self.assertIn("currentQueryField()", content)
