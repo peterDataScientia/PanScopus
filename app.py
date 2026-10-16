@@ -29,6 +29,8 @@ if "query" not in st.session_state:
     st.session_state.query = DEFAULT_QUERY
 if "last_export" not in st.session_state:
     st.session_state.last_export = None
+if "last_debug" not in st.session_state:
+    st.session_state.last_debug = None
 
 client = st.session_state.client
 IS_HOSTED_LINUX = platform.system() == "Linux"
@@ -137,9 +139,11 @@ def run_action(title, call):
             st.error(f"{type(exc).__name__}: {exc}")
             box.update(label=title + " — stopped", state="error", expanded=True)
             try:
-                client.save_debug("streamlit_error")
-            except Exception:
-                pass
+                st.session_state.last_debug = client.save_debug("streamlit_error")
+                if st.session_state.last_debug:
+                    st.info("Scopus browser diagnostic screenshot and JSON are available below.")
+            except Exception as diagnostic_error:
+                log("Diagnostic capture unavailable: " + type(diagnostic_error).__name__)
             return None
         finally:
             client.log = old
@@ -176,7 +180,12 @@ with st.container(border=True):
     st.write("Open Research4Life Standard Login and navigate to Scopus Advanced Search.")
     if st.button("Connect to Scopus", type="primary", disabled=not(user and password)):
         if run_action("Connecting to Scopus", lambda: client.connect(user, password)) is not None:
-            st.success("Scopus Advanced Search is ready.")
+            st.session_state.last_debug = None
+            st.rerun()
+    if connected and st.button("Retry Advanced Search", use_container_width=True):
+        if run_action("Opening Advanced Search", client.return_to_advanced) is not None:
+            st.session_state.last_debug = None
+            st.rerun()
 
 with st.container(border=True):
     st.subheader("02 · Search")
@@ -233,6 +242,30 @@ with st.container(border=True):
 
 with st.expander("Activity log"):
     st.code("\n".join(st.session_state.logs[-60:]), language="text")
-    st.caption(f"Local export folder: {OUTPUT}")
+    st.caption(f"Server export folder: {OUTPUT}")
+
+diagnostic = st.session_state.last_debug
+if diagnostic:
+    with st.expander("Scopus browser diagnostics", expanded=True):
+        st.write("The login steps may succeed even when Scopus Advanced Search fails to render.")
+        screenshot, metadata = (Path(p) for p in diagnostic)
+        if screenshot.is_file():
+            st.image(str(screenshot), caption="Current Scopus browser page", use_container_width=True)
+            st.download_button(
+                "Download screenshot",
+                data=screenshot.read_bytes(),
+                file_name=screenshot.name,
+                mime="image/png",
+                key="scopus_diag_png",
+            )
+        if metadata.is_file():
+            st.download_button(
+                "Download page-state JSON",
+                data=metadata.read_bytes(),
+                file_name=metadata.name,
+                mime="application/json",
+                key="scopus_diag_json",
+            )
+        st.caption("Never share passwords, cookies or Streamlit Secrets in diagnostics.")
 
 st.caption("Streamlit Cloud uses headless Chromium; sessions and exported files are temporary. Use only authorized institutional access.")
