@@ -17,13 +17,13 @@ class CompanionChecks(unittest.TestCase):
         self.assertIn("https://www.scopus.com/*", manifest["host_permissions"])
         self.assertIn("https://*.streamlit.app/*", manifest["host_permissions"])
         self.assertIn("https://share.streamlit.io/*", manifest["host_permissions"])
-        self.assertEqual(manifest["version"], "0.1.1")
+        self.assertEqual(manifest["version"], "0.1.2")
         self.assertNotIn("<all_urls>", manifest["host_permissions"])
         self.assertNotIn("cookies", manifest["permissions"])
         self.assertNotIn("webRequest", manifest["permissions"])
         for filename in [
             "background.js", "panscopus_content.js",
-            "runner.html", "runner.js", "popup.html", "popup.js", "README.md",
+            "runner.html", "runner.js", "popup.html", "popup.js", "query_reader.js", "README.md",
         ]:
             self.assertTrue((EXT / filename).exists(), filename)
 
@@ -34,6 +34,8 @@ class CompanionChecks(unittest.TestCase):
         self.assertIn("PANSCOPUS_START", content)
         self.assertIn("appTab.url", background)
         self.assertIn("panscopusJob", background)
+        self.assertTrue(manifest["content_scripts"][0]["all_frames"])
+        self.assertIn("query_reader.js", manifest["content_scripts"][0]["js"])
         self.assertIn("appTabId", background)
         self.assertIn("currentQueryField()", content)
         self.assertIn('field.closest(', content)
@@ -41,6 +43,8 @@ class CompanionChecks(unittest.TestCase):
         popup = (EXT / "popup.js").read_text(encoding="utf-8")
         self.assertIn("PANSCOPUS_START", popup)
         self.assertIn("executeScript", popup)
+        self.assertIn("allFrames:true", popup)
+        self.assertIn("query_reader.js", popup)
 
     def test_csv_refuses_partial_exports(self):
         runner = (EXT / "runner.js").read_text(encoding="utf-8")
