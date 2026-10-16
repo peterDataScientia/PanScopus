@@ -17,6 +17,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     const job = {
       appTabId: appTab.id,
+      appFrameId: Number.isInteger(msg.appFrameId) ? msg.appFrameId :
+        (Number.isInteger(sender.frameId) ? sender.frameId : 0),
       appUrl: appTab.url,
       query: String(msg.query).trim(),
       created: Date.now(),
