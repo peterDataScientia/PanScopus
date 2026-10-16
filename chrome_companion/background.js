@@ -1,12 +1,14 @@
 "use strict";
 
-const APP_URL_PATTERN = /^https:\/\/[a-z0-9-]+\.streamlit\.app(?::443)?\//i;
+const APP_URL_PATTERN = /^https:\/\/(?:[a-z0-9-]+\.streamlit\.app|share\.streamlit\.io)(?::443)?\//i;
 const ADVANCED_URL = "https://www.scopus.com/pages/search/publications?type=advanced";
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== "PANSCOPUS_START") return;
   (async () => {
-    if (!sender.tab || !APP_URL_PATTERN.test(sender.tab.url || "")) {
+    const appTab = sender.tab || (Number.isInteger(msg.appTabId)
+      ? await chrome.tabs.get(msg.appTabId) : null);
+    if (!appTab || !APP_URL_PATTERN.test(appTab.url || "")) {
       throw new Error("Open PanScopus on its Streamlit Cloud tab first.");
     }
     if (!msg.query || !String(msg.query).trim().startsWith("TITLE-ABS-KEY(")) {
@@ -14,8 +16,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!String(msg.query || "").trim()) throw new Error("Enter an advanced Scopus query first.");
     }
     const job = {
-      appTabId: sender.tab.id,
-      appUrl: sender.tab.url,
+      appTabId: appTab.id,
+      appUrl: appTab.url,
       query: String(msg.query).trim(),
       created: Date.now(),
       approved: true
