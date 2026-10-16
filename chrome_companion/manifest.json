@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PanScopus Browser Companion",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "User-authorized Scopus search and CSV export companion for PanScopus Cloud. No API and no credential collection.",
   "permissions": [
     "tabs",
@@ -25,9 +25,11 @@
         "https://share.streamlit.io/*"
       ],
       "js": [
+        "query_reader.js",
         "panscopus_content.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "action": {
