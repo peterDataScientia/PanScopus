@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PanScopus Companion Runner</title>
+<style>
+:root{color-scheme:light;font:15px system-ui,Arial,sans-serif;background:#f7f9fc;color:#17263b}
+main{max-width:760px;margin:35px auto;padding:22px 26px;background:#fff;border:1px solid #dce2ed;border-radius:14px}
+h1{font-size:25px;margin:0 0 7px}p{line-height:1.5}
+button{background:#145ba0;color:white;border:0;padding:12px 18px;border-radius:8px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}button.secondary{background:#4c5d73}
+#query{padding:10px;background:#f2f5fa;max-height:90px;overflow:auto;font-family:monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+#progress{padding:12px;background:#f4f7fb;border-radius:8px;min-height:100px;white-space:pre-wrap;line-height:1.65}
+.warn{color:#9e4423}.ok{color:#08704c}
+small{color:#5c6575}
+</style>
+</head>
+<body><main>
+<h1>PanScopus Browser Companion</h1>
+<p>Automatic Scopus search → full CSV selection → download → import to PanScopus Cloud, through your normally authorized Chrome session. No Scopus API or local server.</p>
+<div id="query"></div>
+<p><strong>One-time setup:</strong> choose the folder where Chrome saves downloaded files (normally Downloads). Companion uses that folder only to read the new Scopus CSV for this run.</p>
+<p><button id="choose">Choose Chrome download folder</button> <span id="folder">Not selected</span></p>
+<p><button id="start" disabled>Run Search + Export + Import</button> <button class="secondary" id="retry" hidden>Try again</button></p>
+<p id="hint"><small>Keep your authorized Scopus session signed in. Do not share institutional credentials with the extension.</small></p>
+<pre id="progress" role="status" aria-live="polite"></pre>
+<script src="runner.js"></script>
+</main></body></html>
