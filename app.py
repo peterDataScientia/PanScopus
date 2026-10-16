@@ -158,7 +158,7 @@ export = st.session_state.last_export
 with st.sidebar:
     st.title("PanScopus")
     st.caption("Research4Life → Scopus · Cloud workbench")
-    st.caption("Build: Chrome Companion v6")
+    st.caption("Build: Chrome Companion v6.1")
     if user and password:
         st.success("Secrets configured")
     else:
@@ -187,15 +187,11 @@ if IS_HOSTED_LINUX:
             height=155,
             key="query",
         )
-        st.markdown(
-            '<div id="panscopus-companion" data-panscopus-companion="1"></div>',
-            unsafe_allow_html=True,
-        )
         st.caption(
-            "After the Chrome Companion is installed, its Run button appears "
-            "above. The first run asks you to select Chrome's Downloads folder "
-            "for automatic CSV import. Scopus login must already be authorized "
-            "in your normal Chrome session."
+            "Chrome Companion v0.1.1 adds the Run button immediately below "
+            "the query field. If Chrome does not inject the button, click the "
+            "PanScopus extension icon in the Chrome toolbar, then choose "
+            "'Run Search + Export + CSV Import'. Keep this PanScopus tab open."
         )
         with st.expander("Install Companion (one time)"):
             st.markdown(
@@ -203,7 +199,7 @@ if IS_HOSTED_LINUX:
                 "(https://github.com/peterDataScientia/PanScopus/archive/refs/heads/main.zip), "
                 "extract it, then open Chrome `chrome://extensions`, enable "
                 "**Developer mode**, click **Load unpacked** and select the "
-                "`chrome_companion` folder. Return here and refresh. "
+                "`chrome_companion` folder. For v0.1.0 installations, replace the old extension folder with the latest v0.1.1 version and use Chrome Extensions → Reload. Return here and refresh. "
                 "Only install code that you trust; the extension requests Chrome "
                 "debugging access to enter advanced queries into Scopus's Monaco editor."
             )
