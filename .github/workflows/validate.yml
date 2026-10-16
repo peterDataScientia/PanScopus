@@ -1,0 +1,19 @@
+name: Validate PanScopus
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  offline-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify Python syntax
+        run: python -m compileall -q app.py scopus_backend.py
+      - name: Run offline checks
+        run: python -m unittest discover -s tests -v
