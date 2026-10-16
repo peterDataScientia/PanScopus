@@ -8,7 +8,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from scopus_backend import DEFAULT_QUERY, MAX_CSV_EXPORT, ScopusWorkbench
+from scopus_backend import ADVANCED_URL, DEFAULT_QUERY, MAX_CSV_EXPORT, ScopusWorkbench
 from csv_import import parse_scopus_csv
 
 ROOT = Path(__file__).resolve().parent
@@ -158,7 +158,7 @@ export = st.session_state.last_export
 with st.sidebar:
     st.title("PanScopus")
     st.caption("Research4Life → Scopus · Cloud workbench")
-    st.caption("Build: Cloudflare-aware v4")
+    st.caption("Build: Browser-assisted v5")
     if user and password:
         st.success("Secrets configured")
     else:
@@ -173,82 +173,109 @@ with st.sidebar:
     st.caption("Institutional credentials are not shown, saved in logs, or included in exports.")
 
 st.title("PanScopus")
-st.caption("Research4Life authentication · Advanced document search · Verified CSV export")
+st.caption("Research4Life · Scopus advanced searches · Bibliographic CSV")
 if IS_HOSTED_LINUX:
-    st.info("Cloud mode: headless Chromium. Login access still depends on Research4Life institutional authorization.")
+    st.info(
+        "No Scopus API needed. Scopus blocked this cloud server's Chromium with "
+        "Cloudflare, so use your institutionally authorized browser for search/export. "
+        "You can import and inspect the resulting CSV here."
+    )
+    with st.container(border=True):
+        st.subheader("01 · Search in your browser")
+        st.text_area(
+            "Scopus advanced query",
+            height=155,
+            key="query",
+            help="Prepare your advanced search here. Use the Copy icon on the query block below.",
+        )
+        st.caption("Copy the query from this block, then open Scopus Advanced Search.")
+        st.code(st.session_state.query, language="text")
+        st.link_button(
+            "Open Scopus Advanced Search",
+            url=ADVANCED_URL,
+            use_container_width=True,
+            type="primary",
+        )
+        st.caption(
+            "If Scopus requests authentication, follow your normal Research4Life "
+            "sign-in. Paste the query, run Search, select all matching documents "
+            "in Scopus's export dialog, choose CSV, and download. "
+            "Then upload the file below. No local server or API required."
+        )
+
+with (st.expander("Optional: Retry automated Scopus browser (Cloudflare currently blocks hosted access)", expanded=False) if IS_HOSTED_LINUX else st.container()):
+    with st.container(border=True):
+        st.subheader("01 · Connect")
+        st.write("Open Research4Life Standard Login and navigate to Scopus Advanced Search.")
+        if st.button("Connect to Scopus", type="primary", disabled=not(user and password)):
+            if run_action("Connecting to Scopus", lambda: client.connect(user, password)) is not None:
+                st.session_state.last_debug = None
+                st.rerun()
+        if connected and st.button("Retry Advanced Search", use_container_width=True):
+            if run_action("Opening Advanced Search", client.return_to_advanced) is not None:
+                st.session_state.last_debug = None
+                st.rerun()
+
+    with st.container(border=True):
+        st.subheader("02 · Search")
+        if not IS_HOSTED_LINUX:
+            st.text_area("Advanced Scopus query", height=155, key="query")
+        a, b = st.columns([2, 1])
+        with a:
+            clicked = st.button("Run search", use_container_width=True,
+                                type="primary", disabled=not connected or not st.session_state.query.strip())
+        with b:
+            go_back = st.button("Back to Advanced Search", use_container_width=True, disabled=not connected)
+        if clicked:
+            result = run_action("Running search", lambda: client.search(st.session_state.query))
+            if result is not None:
+                st.session_state.last_export = None
+                st.success(f"Verified {result.count:,} matching Scopus documents.")
+                st.caption(result.results_url)
+        if go_back:
+            if run_action("Returning to Advanced Search", client.return_to_advanced) is not None:
+                client.last_search = None
+                st.session_state.last_export = None
+                st.info("Advanced Search reopened on the same Chrome session.")
+        if client.last_search:
+            st.info(f"Current search: {client.last_search.count:,} documents")
+
+    with st.container(border=True):
+        st.subheader("03 · Export")
+        st.caption("Checks the Scopus query, full document selection, metadata and downloaded CSV row count.")
+        count = client.last_search.count if client.last_search else 0
+        if count > MAX_CSV_EXPORT:
+            st.warning(f"{count:,} records exceed the {MAX_CSV_EXPORT:,} per-export CSV limit; partition the query.")
+        if st.button("Export all matching records", type="primary", use_container_width=True,
+                     disabled=not connected or not (0 < count <= MAX_CSV_EXPORT)):
+            result = run_action("Exporting CSV", client.export_csv)
+            if result is not None:
+                st.session_state.last_export = result
+                if result.state == "complete":
+                    st.success(f"CSV verified: {result.rows:,}/{result.expected:,} rows.")
+                elif result.state == "partial_or_mismatch":
+                    st.error(f"Row-count mismatch: {result.rows} of {result.expected}.")
+                else:
+                    st.info("Export submitted; check the Scopus Exports Dashboard for completion.")
+
+        previous = st.session_state.last_export
+        if previous and previous.path:
+            file = Path(previous.path)
+            if file.is_file():
+                st.download_button("Download CSV", data=file.read_bytes(), file_name=file.name,
+                                   mime="text/csv", use_container_width=True)
+                with st.expander("Preview first five records"):
+                    with file.open(encoding="utf-8-sig", errors="replace", newline="") as handle:
+                        records = list(row for _, row in zip(range(5), csv.DictReader(handle)))
+                    if records:
+                        st.dataframe(records, hide_index=True)
 
 with st.container(border=True):
-    st.subheader("01 · Connect")
-    st.write("Open Research4Life Standard Login and navigate to Scopus Advanced Search.")
-    if st.button("Connect to Scopus", type="primary", disabled=not(user and password)):
-        if run_action("Connecting to Scopus", lambda: client.connect(user, password)) is not None:
-            st.session_state.last_debug = None
-            st.rerun()
-    if connected and st.button("Retry Advanced Search", use_container_width=True):
-        if run_action("Opening Advanced Search", client.return_to_advanced) is not None:
-            st.session_state.last_debug = None
-            st.rerun()
-
-with st.container(border=True):
-    st.subheader("02 · Search")
-    st.text_area("Advanced Scopus query", height=155, key="query")
-    a, b = st.columns([2, 1])
-    with a:
-        clicked = st.button("Run search", use_container_width=True,
-                            type="primary", disabled=not connected or not st.session_state.query.strip())
-    with b:
-        go_back = st.button("Back to Advanced Search", use_container_width=True, disabled=not connected)
-    if clicked:
-        result = run_action("Running search", lambda: client.search(st.session_state.query))
-        if result is not None:
-            st.session_state.last_export = None
-            st.success(f"Verified {result.count:,} matching Scopus documents.")
-            st.caption(result.results_url)
-    if go_back:
-        if run_action("Returning to Advanced Search", client.return_to_advanced) is not None:
-            client.last_search = None
-            st.session_state.last_export = None
-            st.info("Advanced Search reopened on the same Chrome session.")
-    if client.last_search:
-        st.info(f"Current search: {client.last_search.count:,} documents")
-
-with st.container(border=True):
-    st.subheader("03 · Export")
-    st.caption("Checks the Scopus query, full document selection, metadata and downloaded CSV row count.")
-    count = client.last_search.count if client.last_search else 0
-    if count > MAX_CSV_EXPORT:
-        st.warning(f"{count:,} records exceed the {MAX_CSV_EXPORT:,} per-export CSV limit; partition the query.")
-    if st.button("Export all matching records", type="primary", use_container_width=True,
-                 disabled=not connected or not (0 < count <= MAX_CSV_EXPORT)):
-        result = run_action("Exporting CSV", client.export_csv)
-        if result is not None:
-            st.session_state.last_export = result
-            if result.state == "complete":
-                st.success(f"CSV verified: {result.rows:,}/{result.expected:,} rows.")
-            elif result.state == "partial_or_mismatch":
-                st.error(f"Row-count mismatch: {result.rows} of {result.expected}.")
-            else:
-                st.info("Export submitted; check the Scopus Exports Dashboard for completion.")
-
-    previous = st.session_state.last_export
-    if previous and previous.path:
-        file = Path(previous.path)
-        if file.is_file():
-            st.download_button("Download CSV", data=file.read_bytes(), file_name=file.name,
-                               mime="text/csv", use_container_width=True)
-            with st.expander("Preview first five records"):
-                with file.open(encoding="utf-8-sig", errors="replace", newline="") as handle:
-                    records = list(row for _, row in zip(range(5), csv.DictReader(handle)))
-                if records:
-                    st.dataframe(records, hide_index=True)
-
-with st.container(border=True):
-    st.subheader("04 · Import authorized Scopus CSV")
+    st.subheader("02 · Import your Scopus CSV" if IS_HOSTED_LINUX else "04 · Import authorized Scopus CSV")
     st.caption(
-        "Cloudflare is currently refusing the hosted Scopus browser. "
-        "Export CSV from a Scopus session that your institution authorizes, "
-        "then upload it here for a record-count and metadata check. "
-        "No Selenium login is required for importing."
+        "Upload the CSV exported by your institutionally authorized Scopus browser. "
+        "PanScopus checks document count, DOI/EID duplicates and metadata. "
+        "No API, local server or hosted Selenium login is needed for import."
     )
     uploaded = st.file_uploader(
         "Upload Scopus CSV",
