@@ -36,18 +36,60 @@ IS_HOSTED_LINUX = platform.system() == "Linux"
 # The Cloud web app uses institutional credentials stored in secrets.
 # Block anonymous visitors from using them on public deployments.
 def configured_access_pin():
+    """Read the app PIN from several valid Streamlit Secrets layouts.
+
+    This avoids silently treating correctly saved top-level secrets as
+    missing when the original app expected only [app].access_pin.
+    Never log or display the PIN.
+    """
+    paths = (
+        ("app", "access_pin"),
+        ("app", "pin"),
+        ("app", "APP_ACCESS_PIN"),
+        ("auth", "access_pin"),
+        ("security", "access_pin"),
+        ("research4life", "access_pin"),
+        ("research4life", "app_access_pin"),
+        ("APP_ACCESS_PIN",),
+        ("PANSCOPUS_ACCESS_PIN",),
+        ("app_access_pin",),
+        ("access_pin",),
+        ("ACCESS_PIN",),
+    )
     try:
-        return str(st.secrets.get("app", {}).get("access_pin", "")).strip()
+        secrets = st.secrets
+        for path in paths:
+            obj = secrets
+            try:
+                for key in path:
+                    obj = obj[key]
+                if isinstance(obj, (str, int)):
+                    value = str(obj).strip()
+                    if value and not value.startswith("SET_A_"):
+                        return value
+            except (KeyError, TypeError, AttributeError):
+                continue
     except Exception:
-        return ""
+        pass
+    return ""
 
 if IS_HOSTED_LINUX and not st.session_state.get("authorized", False):
     st.title("PanScopus")
     st.caption("Research4Life → Scopus · Cloud workbench")
     pin = configured_access_pin()
     if not pin:
-        st.error("Add [app] access_pin to Streamlit Cloud Secrets to protect institutional access.")
-        st.caption("The app UI has started, but institutional automation is locked until a private access PIN is configured.")
+        st.error("PanScopus access PIN was not detected in this deployment.")
+        st.markdown(
+            "Open **Manage app → Settings → Secrets** and add either "
+            "`access_pin = \"YOUR_PRIVATE_PIN\"` at the top level or "
+            "`[app]` followed by `access_pin = \"YOUR_PRIVATE_PIN\"`. "
+            "Click **Save**, then **Reboot app**. "
+            "Do not paste your actual PIN or institutional password into this chat."
+        )
+        st.caption(
+            "The web interface loaded. Institutional login remains protected "
+            "until the app receives its access PIN."
+        )
     else:
         with st.form("panscopus_unlock"):
             entered = st.text_input("PanScopus access PIN", type="password")
