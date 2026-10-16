@@ -1,7 +1,8 @@
-"""PanScopus local Streamlit interface for authorized Research4Life/Scopus access."""
+"""PanScopus cloud-capable Streamlit interface for authorized Research4Life/Scopus access."""
 from __future__ import annotations
 
 import csv
+import hmac
 import platform
 from pathlib import Path
 
@@ -30,15 +31,48 @@ if "last_export" not in st.session_state:
     st.session_state.last_export = None
 
 client = st.session_state.client
-LOCAL_CHROME_SUPPORTED = platform.system() == "Windows"
+IS_HOSTED_LINUX = platform.system() == "Linux"
+
+# The Cloud web app uses institutional credentials stored in secrets.
+# Block anonymous visitors from using them on public deployments.
+def configured_access_pin():
+    try:
+        return str(st.secrets.get("app", {}).get("access_pin", "")).strip()
+    except Exception:
+        return ""
+
+if IS_HOSTED_LINUX and not st.session_state.get("authorized", False):
+    st.title("PanScopus")
+    st.caption("Research4Life → Scopus · Cloud workbench")
+    pin = configured_access_pin()
+    if not pin:
+        st.error("Add [app] access_pin to Streamlit Cloud Secrets to protect institutional access.")
+        st.caption("The app UI has started, but institutional automation is locked until a private access PIN is configured.")
+    else:
+        with st.form("panscopus_unlock"):
+            entered = st.text_input("PanScopus access PIN", type="password")
+            submitted = st.form_submit_button("Unlock PanScopus", type="primary")
+        if submitted:
+            if hmac.compare_digest(entered, pin):
+                st.session_state.authorized = True
+                st.rerun()
+            else:
+                st.error("Invalid access PIN")
+    st.stop()
 
 
 def configured_credentials():
     """Missing or malformed secrets must NEVER crash the Streamlit UI."""
     try:
-        credentials = st.secrets["research4life"]
-        username = str(credentials.get("username", "")).strip()
-        password = str(credentials.get("password", ""))
+        credentials = st.secrets.get("research4life", {})
+        username = str(
+            credentials.get("username") or st.secrets.get("R4L_USERNAME")
+            or st.secrets.get("username") or ""
+        ).strip()
+        password = str(
+            credentials.get("password") or st.secrets.get("R4L_PASSWORD")
+            or st.secrets.get("password") or ""
+        )
         if username.startswith("YOUR_") or password.startswith("YOUR_"):
             return "", ""
         return username, password
@@ -76,7 +110,7 @@ export = st.session_state.last_export
 
 with st.sidebar:
     st.title("PanScopus")
-    st.caption("Research4Life → Scopus · Local workbench")
+    st.caption("Research4Life → Scopus · Cloud workbench")
     if user and password:
         st.success("Secrets configured")
     else:
@@ -92,13 +126,13 @@ with st.sidebar:
 
 st.title("PanScopus")
 st.caption("Research4Life authentication · Advanced document search · Verified CSV export")
-if not LOCAL_CHROME_SUPPORTED:
-    st.warning("This hosted/Linux environment is a UI preview. The connected Research4Life/Scopus Selenium browser requires local Windows Chrome. Do not place institutional credentials in a public Cloud app.")
+if IS_HOSTED_LINUX:
+    st.info("Cloud mode: headless Chromium. Login access still depends on Research4Life institutional authorization.")
 
 with st.container(border=True):
     st.subheader("01 · Connect")
     st.write("Open Research4Life Standard Login and navigate to Scopus Advanced Search.")
-    if st.button("Connect to Scopus", type="primary", disabled=not(user and password and LOCAL_CHROME_SUPPORTED)):
+    if st.button("Connect to Scopus", type="primary", disabled=not(user and password)):
         if run_action("Connecting to Scopus", lambda: client.connect(user, password)) is not None:
             st.success("Scopus Advanced Search is ready.")
 
@@ -108,9 +142,9 @@ with st.container(border=True):
     a, b = st.columns([2, 1])
     with a:
         clicked = st.button("Run search", use_container_width=True,
-                            type="primary", disabled=not LOCAL_CHROME_SUPPORTED or not connected or not st.session_state.query.strip())
+                            type="primary", disabled=not connected or not st.session_state.query.strip())
     with b:
-        go_back = st.button("Back to Advanced Search", use_container_width=True, disabled=not LOCAL_CHROME_SUPPORTED or not connected)
+        go_back = st.button("Back to Advanced Search", use_container_width=True, disabled=not connected)
     if clicked:
         result = run_action("Running search", lambda: client.search(st.session_state.query))
         if result is not None:
@@ -132,7 +166,7 @@ with st.container(border=True):
     if count > MAX_CSV_EXPORT:
         st.warning(f"{count:,} records exceed the {MAX_CSV_EXPORT:,} per-export CSV limit; partition the query.")
     if st.button("Export all matching records", type="primary", use_container_width=True,
-                 disabled=not LOCAL_CHROME_SUPPORTED or not connected or not (0 < count <= MAX_CSV_EXPORT)):
+                 disabled=not connected or not (0 < count <= MAX_CSV_EXPORT)):
         result = run_action("Exporting CSV", client.export_csv)
         if result is not None:
             st.session_state.last_export = result
@@ -159,4 +193,4 @@ with st.expander("Activity log"):
     st.code("\n".join(st.session_state.logs[-60:]), language="text")
     st.caption(f"Local export folder: {OUTPUT}")
 
-st.caption("The interface can load on Streamlit Cloud, but authenticated Selenium browser automation is supported for local Windows use only; cloud execution has not been validated.")
+st.caption("Streamlit Cloud uses headless Chromium; sessions and exported files are temporary. Use only authorized institutional access.")
