@@ -141,6 +141,9 @@ class ScopusWorkbench:
         packages.txt installs the matching Chromium and ChromeDriver.
         """
         opts = webdriver.ChromeOptions()
+        # Scopus is a heavy React SPA. Waiting for all analytics/network
+        # resources causes ChromeDriver.get() to appear stuck in Cloud.
+        opts.page_load_strategy = "eager"
         opts.add_argument("--window-size=1600,1050")
         opts.add_argument("--disable-popup-blocking")
         opts.add_experimental_option("prefs", {
@@ -190,6 +193,11 @@ class ScopusWorkbench:
                 "Details: " + str(exc)[:600]
             ) from exc
 
+        # Do not let a stalled third-party Scopus resource hold the entire
+        # Streamlit UI indefinitely. Wait for required DOM nodes separately.
+        self.driver.set_page_load_timeout(30)
+        self.driver.set_script_timeout(20)
+        self.log("Cloud Chrome ready (bounded navigation)")
         try:
             self.driver.execute_cdp_cmd(
                 "Page.setDownloadBehavior",
@@ -405,58 +413,64 @@ class ScopusWorkbench:
         self._follow_tab(before, timeout=3)
         return True
 
+    def _visit_scopus_page(self, url):
+        """Open a first-party Scopus URL without waiting on unrelated network traffic."""
+        self.log("Scopus navigation: " + url)
+        try:
+            self.driver.get(url)
+        except TimeoutException:
+            self.log(
+                "Navigation exceeded 30 seconds; inspecting the already "
+                "loaded Scopus document rather than blocking indefinitely"
+            )
+        if not self.is_scopus():
+            raise RuntimeError(
+                "Scopus navigation redirected away from Scopus to " +
+                self.driver.current_url
+            )
+
     def return_to_advanced(self):
         if not self.is_scopus():
             raise RuntimeError("Connect to Scopus first")
-
+        self.log("Advanced Search: checking editor")
         if self._editor() is not None:
             self.log("Advanced Search editor already ready")
             return self.driver.current_url
 
-        self.log("Opening Scopus Advanced Search")
+        # A predictable bounded sequence for Scopus's client-side application.
+        self.log("Advanced Search: opening official URL")
         if "type=advanced" not in self.driver.current_url.lower():
-            self.driver.get(ADVANCED_URL)
-
-        if self._wait_for_editor(32):
+            self._visit_scopus_page(ADVANCED_URL)
+        if self._wait_for_editor(25):
             self.log("Advanced Search editor loaded")
             return self.driver.current_url
 
         first = self._scopus_state()
         self.log(
-            "Advanced editor not found after direct navigation. "
-            "URL=" + str(first.get("url", "")) +
-            "; page=" + str(first.get("title", ""))
+            "Editor absent after direct navigation. URL=" + str(first.get("url", "")) +
+            "; page=" + str(first.get("title", "")) +
+            "; Monaco=" + str(first.get("monaco_nodes", 0))
         )
 
-        # Some Scopus sessions create a client-side navigation state
-        # only after visiting the Search page from the site menu.
-        # This uses ordinary first-party navigation, not a bypass.
-        self.log("Trying Scopus Search page and its Advanced Search link")
-        for url in (
-            "https://www.scopus.com/pages/home#basic",
-            "https://www.scopus.com/pages/search/publications?type=basic",
-        ):
-            self.driver.get(url)
-            self.log("Scopus navigation: " + self.driver.current_url)
-            if self._wait_for_editor(10):
-                self.log("Advanced Search editor loaded")
-                return self.driver.current_url
-            if self._click_advanced_link() and self._wait_for_editor(20):
-                self.log("Advanced Search editor loaded through site link")
-                return self.driver.current_url
+        # Use the site's own link once, so the workflow remains predictable.
+        self.log("Advanced Search: trying Scopus navigation control")
+        self._visit_scopus_page("https://www.scopus.com/pages/home#basic")
+        if self._click_advanced_link() and self._wait_for_editor(15):
+            self.log("Advanced Search editor loaded through site link")
+            return self.driver.current_url
 
         final = self._scopus_state()
         self.log(
-            "Advanced Search unresolved. URL=" + str(final.get("url", "")) +
+            "Scopus editor still unavailable. URL=" + str(final.get("url", "")) +
             "; title=" + str(final.get("title", "")) +
             "; DOM ready=" + str(final.get("ready_state", "")) +
             "; Monaco nodes=" + str(final.get("monaco_nodes", 0))
         )
         raise RuntimeError(
             self._page_problem(final)
-            or "Scopus Advanced Search editor did not load in Cloud Chromium. "
-               "Check the diagnostic screenshot and page-state JSON below; "
-               "the Research4Life login succeeded, but the editor is not yet accessible."
+            or "Scopus Advanced Search editor did not render in Cloud Chromium. "
+               "Download the Scopus browser screenshot and page-state JSON from "
+               "the diagnostics panel to identify the actual page."
         )
 
     def _results_match(self, query):
