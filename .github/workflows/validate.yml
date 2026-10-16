@@ -16,7 +16,7 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install -r requirements.txt
       - name: Verify Python syntax
-        run: python -m compileall -q app.py csv_import.py scopus_backend.py
+        run: python -m compileall -q app.py csv_import.py scopus_backend.py run_windows_auto.py
       - name: Verify Chrome Companion JavaScript syntax
         run: |
           node --check chrome_companion/background.js
